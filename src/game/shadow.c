@@ -259,25 +259,37 @@ s8 init_shadow(struct Shadow *s, f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, 
 
 /**
  * Given a `vertexNum` from a shadow with nine vertices, update the
- * texture coordinates corresponding to that vertex. That is:
- *      0 = (0,   0)         1 = (7,   0)         2 = (15,   0)
- *      3 = (0,   7)         4 = (7,   7)         5 = (15,   7)
- *      6 = (0,  15)         7 = (7,  15)         8 = (15,  15)
+ * texture coordinates corresponding to that vertex. For quarter-circle
+ * textures (16x16), this maps the full mirrored range to 32 texels:
+ *      0 = (0,   0)         1 = (15,   0)         2 = (31,   0)
+ *      3 = (0,  15)         4 = (15,  15)         5 = (31,  15)
+ *      6 = (0,  31)         7 = (15,  31)         8 = (31,  31)
  */
 void get_texture_coords_9_vertices(s8 vertexNum, s16 *textureX, s16 *textureY) {
-    *textureX = (vertexNum % 3) * 8 - !((vertexNum % 3) == 0);
-    *textureY = (vertexNum / 3) * 8 - !((vertexNum / 3) == 0);
+#if defined(TARGET_PSP)
+    // 180-degree quadrant flips for PSP when G_TX_MIRROR is missing.
+    // Convert nominal 0/15/31 coordinates to anti-mirror: 15/0/15.
+    s16 baseX = (vertexNum % 3) * 16 - !((vertexNum % 3) == 0);
+    s16 baseY = (vertexNum / 3) * 16 - !((vertexNum / 3) == 0);
+
+    *textureX = (baseX <= 15) ? (15 - baseX) : (baseX - 16);
+    *textureY = (baseY <= 15) ? (15 - baseY) : (baseY - 16);
+#else
+    *textureX = (vertexNum % 3) * 16 - !((vertexNum % 3) == 0);
+    *textureY = (vertexNum / 3) * 16 - !((vertexNum / 3) == 0);
+#endif
 }
 
 /**
  * Given a `vertexNum` from a shadow with four vertices, update the
- * texture coordinates corresponding to that vertex. That is:
- *      0 = (0,   0)         1 = (15,   0)
- *      2 = (0,  15)         3 = (15,  15)
+ * texture coordinates corresponding to that vertex. For quarter-circle
+ * textures, this maps to the full mirrored range:
+ *      0 = (0,   0)         1 = (31,   0)
+ *      2 = (0,  31)         3 = (31,  31)
  */
 void get_texture_coords_4_vertices(s8 vertexNum, s16 *textureX, s16 *textureY) {
-    *textureX = (vertexNum % 2) * 15;
-    *textureY = (vertexNum / 2) * 15;
+    *textureX = (vertexNum % 2) * 31;
+    *textureY = (vertexNum / 2) * 31;
 }
 
 /**
@@ -672,6 +684,12 @@ Gfx *create_shadow_circle_9_verts(f32 xPos, f32 yPos, f32 zPos, s16 shadowScale,
  * Create a circular shadow composed of 4 vertices.
  */
 Gfx *create_shadow_circle_4_verts(f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, u8 solidity) {
+#if defined(TARGET_PSP)
+    // PSP does not support hardware mirrored texture wrapping. Use the
+    // 9-vertex shadow path (with mirror-emulated UVs) so the circle is
+    // composed correctly.
+    return create_shadow_circle_9_verts(xPos, yPos, zPos, shadowScale, solidity);
+#else
     Vtx *verts;
     Gfx *displayList;
     struct Shadow shadow;
@@ -693,6 +711,7 @@ Gfx *create_shadow_circle_4_verts(f32 xPos, f32 yPos, f32 zPos, s16 shadowScale,
     }
     add_shadow_to_display_list(displayList, verts, SHADOW_WITH_4_VERTS, SHADOW_SHAPE_CIRCLE);
     return displayList;
+#endif
 }
 
 /**

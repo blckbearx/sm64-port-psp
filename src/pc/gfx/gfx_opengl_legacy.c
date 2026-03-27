@@ -559,12 +559,8 @@ static uint32_t gfx_cm_to_opengl(uint32_t val) {
     if (val & G_TX_CLAMP)
         return GL_CLAMP_TO_EDGE;
 #if defined(TARGET_PSP)
-    /*@Note: no mirroring on pspgl, still unsure how to properly handle
-        for now, directly patching the images and DLs to fix */
-    /*if(val & G_TX_MIRROR){
-        glDisable(GL_TEXTURE_2D);
-    }*/
-    return GL_REPEAT;//(val & G_TX_MIRROR) ? GL_REPEAT : GL_REPEAT;
+    /*@Note: try GL_MIRRORED_REPEAT on pspgl */
+    return (val & G_TX_MIRROR) ? GL_MIRRORED_REPEAT : GL_REPEAT;
 #else
     return (val & G_TX_MIRROR) ? GL_MIRRORED_REPEAT : GL_REPEAT;
 #endif
